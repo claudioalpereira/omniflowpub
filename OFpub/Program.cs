@@ -54,9 +54,9 @@ namespace OFpub
                 {
                     try
                     {
-                        client.Publish(TOPIC_INSTDATA, Encoding.UTF8.GetBytes(DateTime.Now.ToString() + "\n" + of.GetInstData()), MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE, true);
-                        of.UpdateInstData();
+                        client.Publish(TOPIC_INSTDATA, Encoding.UTF8.GetBytes(of.GetInstData()), MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE, true);
                         Console.WriteLine("published instdata");
+                        of.UpdateInstData();
                         Thread.Sleep(_instdataRefreshRate);
                     }
                     catch (Exception ex)
@@ -77,7 +77,7 @@ namespace OFpub
                 {
                     try
                     {
-                        client.Publish(TOPIC_CONFDATA, Encoding.UTF8.GetBytes(DateTime.Now.ToString() + "\n" + of.GetConfData()), MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE, true);
+                        client.Publish(TOPIC_CONFDATA, Encoding.UTF8.GetBytes(of.GetConfData()), MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE, true);
                         of.UpdateConfData();
                         Console.WriteLine("published confdata");
                         Thread.Sleep(_confdataRefreshRate);
@@ -100,7 +100,7 @@ namespace OFpub
                 {
                     try
                     {
-                        client.Publish(TOPIC_MEASURES, Encoding.UTF8.GetBytes(DateTime.Now.ToString() + "\n" + of.GetMeasures()), MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE, true);
+                        client.Publish(TOPIC_MEASURES, Encoding.UTF8.GetBytes(of.GetMeasures()), MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE, true);
                         Console.WriteLine("published measures");
                         Thread.Sleep(_measuresRefreshRate);
                     }
@@ -257,7 +257,7 @@ namespace OFpub
                         Console.WriteLine("put "+key+" "+value);
                         of.UpdateConfData();
                         Thread.Sleep(10 * 1000); // wait 10s, as stated in API doc
-                        client.Publish(TOPIC_CONFDATA, Encoding.UTF8.GetBytes(DateTime.Now.ToString() + "\n" + of.GetConfData()), MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE, true);
+                        client.Publish(TOPIC_CONFDATA, Encoding.UTF8.GetBytes(of.GetConfData()), MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE, true);
                     });
                     break;
                 default:
