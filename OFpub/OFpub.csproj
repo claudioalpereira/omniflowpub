@@ -47,6 +47,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="OFSock.cs" />
     <Compile Include="OFWrapper.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Program2.cs" />

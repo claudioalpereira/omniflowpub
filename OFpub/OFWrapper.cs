@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace OFpub
@@ -16,124 +17,205 @@ namespace OFpub
     public sealed class OFWrapper
     {
         private static readonly OFWrapper instance = new OFWrapper();
-        public static OFWrapper Instance
-        {
-            get
-            {
-                return instance;
-            }
-        }
-           
+        private string SERVER_IP;
+        private int SERVER_PORT;
+        private string USER_IMEI;
+        private string USER_NAME;
+        private string USER_PASS;
+        private Socket stateSock;
+        private Socket instSock;
+        private Socket confSock;
+        private Socket measuresSock;
+        private Socket putSock;
+        
         // Explicit static constructor to tell C# compiler
         // not to mark type as beforefieldinit
         static OFWrapper()
         {
         }
 
-        private string SERVER_IP;
-        private int SERVER_PORT;
-        private string USER_IMEI;
-        private string USER_NAME;
-        private string USER_PASS;
-        private Socket sok;
-
         private OFWrapper()
         {
-            // TODO: read from conf file
             SERVER_IP = "62.28.231.130";
             SERVER_PORT = 19000;
             USER_IMEI = "357976063980593";
             USER_NAME = "Siemens";
             USER_PASS = "Omni2016";
 
-            Console.WriteLine("Instatiating socket...");
-            sok = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            ReconnectSocket();
+            Console.WriteLine("Putting on the socks...");
+            stateSock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            instSock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            confSock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            measuresSock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            putSock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            ConnectSocket(stateSock);
+            ConnectSocket(instSock);
+            ConnectSocket(confSock);
+            ConnectSocket(measuresSock);
+            ConnectSocket(putSock);
         }
+
         ~OFWrapper()
         {
-            sok.Dispose();
+
         }
 
-        public string GetInstData()
+        public static OFWrapper Instance
         {
-            Console.WriteLine("getting inst data from omniflow...");
-            var r = QueryServer("+getinstdata");
-            Console.WriteLine("received inst data from omniflow");
-            return r;
-        }
-
-        public void UpdateInstData()
-        {
-            QueryServer("+updateinst");
-        }
-
-        public string GetConfData()
-        {
-            return QueryServer("+getconfdata");
-        }
-
-        public void UpdateConfData()
-        {
-            QueryServer("+updateconf");
+            get { return instance; }
         }
 
         public string GetState()
         {
-            return QueryServer("+getstate");
+            return SocketQuery(stateSock, "+getstate");
+            
         }
+        public string GetInstData()
+        {
+            return SocketQuery(stateSock, "+getinstdata");
 
+        }
+        public void UpdateInstData()
+        {
+            SocketQuery(stateSock, "+updateinst");
+
+        }
+        public string GetConfData()
+        {
+            return SocketQuery(stateSock, "+getconfdata");
+
+        }
+        public void UpdateConfData()
+        {
+            SocketQuery(stateSock, "+updateconf");
+
+        }
         public string GetMeasures(DateTime? from = null, DateTime? to = null)
         {
             from = from ?? DateTime.Now.AddDays(-10);
             to = to ?? DateTime.Now;
 
-            return QueryServer(string.Format("+getmeasures[{0:yyyy-MM-dd},{1:yyyy-MM-dd}]", from, to)).Trim('"');
+            return SocketQuery(measuresSock, string.Format("+getmeasures[{0:yyyy-MM-dd},{1:yyyy-MM-dd}]", from, to)).Trim('"');
         }
 
-        private void ReconnectSocket()
+        public void PutValue(string key, string value)
         {
-            byte[] received = new byte[1024 * 1024];
+            SocketQuery(putSock, string.Format("+put[{0},{1}]", key, value));
+            UpdateInstData();
+            UpdateConfData();
+        }
 
-          if(!sok.Connected)
+
+        private void ConnectSocket(Socket sock)
+        {
+            if (!sock.Connected)
             {
+                byte[] received = new byte[1024 * 1024];
+
                 Console.WriteLine("Connecting socket to {0}:{1}", SERVER_IP, SERVER_PORT);
-                sok.Connect(new IPEndPoint(IPAddress.Parse(SERVER_IP), SERVER_PORT));
-                if (sok.Connected)
+                sock.Connect(new IPEndPoint(IPAddress.Parse(SERVER_IP), SERVER_PORT));
+                if (sock.Connected)
                 {
                     Console.WriteLine("Socket Connected!");
                 }
                 else
                 {
                     Console.Error.WriteLine("Cannot connect to socket!!!");
+                    return;
                 }
-           
-                Console.WriteLine("Login in at OF server...");
-                sok.Send(Encoding.ASCII.GetBytes("+login[" + USER_IMEI + " , " + USER_NAME + " , " + USER_PASS + "]"));
 
-                int bytesReceived = sok.Receive(received);
-                Console.WriteLine("Received from server: ", Encoding.ASCII.GetString(received, 0, bytesReceived));
+                Console.WriteLine("Login in at OF server...");
+                sock.Send(Encoding.ASCII.GetBytes("+login[" + USER_IMEI + " , " + USER_NAME + " , " + USER_PASS + "]"));
+
+                int bytesReceived = sock.Receive(received);
+                Console.WriteLine("Logged on server: ", Encoding.ASCII.GetString(received, 0, bytesReceived));
             }
         }
 
-        public string QueryServer(string request)
+        /// <summary>
+        /// Sends a message to the server and wait for aresponse.
+        /// Used for retrieving data e.g. State, InstData, etc...
+        /// </summary>
+        /// <param name="sock">Socket</param>
+        /// <param name="request">request command (e.g. +getconfdata)</param>
+        /// <returns></returns>
+        public string SocketQuery(Socket sock, string request)
         {
             byte[] bytes = new byte[1024 * 1024];
             string ret = null;
 
-//            if (!sok.Connected)
-//                ReconnectSocket();
+            lock (sock)
+            {
+                try
+                {
+                    try
+                    {
+                        int bytesSent = sock.Send(Encoding.ASCII.GetBytes(request));
 
-            sok.Send(Encoding.ASCII.GetBytes(request));
+                        int bytesRec = sock.Receive(bytes);
 
-            int bytesRec = sok.Receive(bytes);
+                        ret = Encoding.ASCII.GetString(bytes, 0, bytesRec);
+                    }
+                    catch (ArgumentNullException ane)
+                    {
+                        Console.WriteLine("ArgumentNullException : {0}", ane.ToString());
+
+                    }
+                    catch (SocketException se)
+                    {
+                        Console.WriteLine("SocketException : {0}", se.ToString());
+
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("Unexpected exception : {0}", e.ToString());
+                    }
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e.ToString());
+                }
+            }
             
-            //sok.Shutdown(SocketShutdown.Both);
-            //sok.Close();
 
-            ret = Encoding.ASCII.GetString(bytes, 0, bytesRec);
-               
             return ret;
+        }
+
+        /// <summary>
+        /// Sends a message to the server and doesn't wait for a response.
+        /// Used for PUT and UPDATE commands.
+        /// </summary>
+        /// <param name="sock">Socket</param>
+        /// <param name="request">Request command (e.g. +updateconf)</param>
+        public void SocketSend(Socket sock, string request)
+        {
+            byte[] bytes = new byte[1024 * 1024];
+
+            try
+            {
+                try
+                {
+                    int bytesSent = sock.Send(Encoding.ASCII.GetBytes(request));
+                }
+                catch (ArgumentNullException ane)
+                {
+                    Console.WriteLine("ArgumentNullException : {0}", ane.ToString());
+
+                }
+                catch (SocketException se)
+                {
+                    Console.WriteLine("SocketException : {0}", se.ToString());
+
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("Unexpected exception : {0}", e.ToString());
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.ToString());
+            }
         }
     }
 }
