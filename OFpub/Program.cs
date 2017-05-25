@@ -11,21 +11,30 @@ using uPLibrary.Networking.M2Mqtt.Messages;
 
 namespace OFpub
 {
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <todo>
+    /// - usar config file em vez de hardcoded configs
+    /// - aceitar configs como args da linha de comandos
+    /// </todo>
     class Program
     {
         // OmniFlow Server
         const string OF_IP = "62.28.231.130";
+        //const string OF_IP = "test.mosquitto.org";
         const int OF_PORT = 19000;
         const string OF_IMEI = "357976063980593";
         const string OF_USER = "Siemens";
         const string OF_PASS = "Omni2016";
-        static int _instdataRefreshRate = 5 * 60 * 1000;       // defaults to 5 minutes
+        static int _instdataRefreshRate =   5 * 1;       // defaults to 5 minutes
         static int _confdataRefreshRate = 1 * 60 * 60 * 1000;  // defaults to 1 hour
         static int _measuresRefreshRate = 24 * 60 * 60 * 1000; // defaults to 1 day
-        static OFAPI of;
-        
+        //static OFAPI of;
+        static OFWrapper of;
+
         // MQTT Server
-        const string BROKER_URL = "test.mosquitto.org";
+        static string _brokerUrl = "52.39.125.106";
         const string TOPIC_INSTDATA = "clealp/sie/of/instdata";
         const string TOPIC_CONFDATA = "clealp/sie/of/confdata";
         const string TOPIC_MEASURES = "clealp/sie/of/measures";
@@ -35,29 +44,84 @@ namespace OFpub
 
         static void Main(string[] args)
         {
+            if (args.Length > 0)
+                _brokerUrl = args[0];
+
             // MQTT bootstrap
-            client = new MqttClient("test.mosquitto.org");
+            client = new MqttClient(_brokerUrl);
+            // DEBUG:
             client.Subscribe(new[] {"clealp/sie/of/put", "clealp/sie/of/instdata" }, new byte[] { MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE, MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE });
             client.MqttMsgPublishReceived += ClientRecievedMessage;
 
             client.Connect(Guid.NewGuid().ToString());
 
+            Console.WriteLine("connected:"+ client.IsConnected);
+
+
             // Omniflow bootstrap
-            of = new OFAPI(OF_IP, OF_PORT, OF_IMEI, OF_USER, OF_PASS);
+            //of = new OFAPI(OF_IP, OF_PORT, OF_IMEI, OF_USER, OF_PASS);
+            of = OFWrapper.Instance;
 
             //INST DATA
             //
             //TODO: bloquear a thread em vez de fazer sleep para poupar recursos
             var t1 = Task.Run(() =>
             {
+                string _instdata = "";
                 do
                 {
                     try
                     {
-                        client.Publish(TOPIC_INSTDATA, Encoding.UTF8.GetBytes(of.GetInstData()), MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE, true);
-                        Console.WriteLine("published instdata");
+                        Console.WriteLine("publishing instdata");
+
+                        var instdata = of.GetInstData();
+                        if (!_instdata.Equals(instdata))
+                        {
+                            _instdata = instdata;
+                            client.Publish(TOPIC_INSTDATA, Encoding.UTF8.GetBytes(_instdata), MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE, true);
+                            Console.WriteLine("published instdata");
+
+                        }
+                        else
+                        {
+                            Console.WriteLine("instdata retrieved is already published");
+                        }
                         of.UpdateInstData();
                         Thread.Sleep(_instdataRefreshRate);
+                    }
+                    catch (Exception ex)
+                    {
+                        // debaixodotapetator pattern
+                        Console.WriteLine("EXCEPTION:\n" + ex.Message);
+                    }
+                } while (true);
+
+            });
+
+            // CONF DATA
+            var t2 = Task.Run(() =>
+            {
+                string _confdata = "";
+                do
+                {
+                    try
+                    {
+                        Console.WriteLine("publishing confdata");
+
+                        var confdata = of.GetConfData();
+                        if (!_confdata.Equals(confdata))
+                        {
+                            _confdata = confdata;
+                            client.Publish(TOPIC_CONFDATA, Encoding.UTF8.GetBytes(_confdata), MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE, true);
+                            Console.WriteLine("published confdata");
+
+                        }
+                        else
+                        {
+                            Console.WriteLine("confdata retrieved is already published");
+                        }
+                        of.UpdateConfData();
+                        Thread.Sleep(_confdataRefreshRate);
                     }
                     catch (Exception ex)
                     {
@@ -71,49 +135,49 @@ namespace OFpub
             //CONF DATA
             //
             //TODO: bloquear a thread em vez de fazer sleep para poupar recursos
-            var t2 = Task.Run(() =>
-            {
-                do
-                {
-                    try
-                    {
-                        client.Publish(TOPIC_CONFDATA, Encoding.UTF8.GetBytes(of.GetConfData()), MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE, true);
-                        of.UpdateConfData();
-                        Console.WriteLine("published confdata");
-                        Thread.Sleep(_confdataRefreshRate);
-                    }
-                    catch (Exception ex)
-                    {
-                        // debaixodotapetator pattern
-                        Console.WriteLine("EXCEPTION:\n" + ex.Message);
-                    }
-                } while (true);
+            /*           var t2 = Task.Run(() =>
+                       {
+                           do
+                           {
+                               try
+                               {
+                                   client.Publish(TOPIC_CONFDATA, Encoding.UTF8.GetBytes(of.GetConfData()), MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE, true);
+                                   of.UpdateConfData();
+                                   Console.WriteLine("published confdata");
+                                   Thread.Sleep(_confdataRefreshRate);
+                               }
+                               catch (Exception ex)
+                               {
+                                   // debaixodotapetator pattern
+                                   Console.WriteLine("EXCEPTION:\n" + ex.Message);
+                               }
+                           } while (true);
 
-            });
+                       });
 
-            //MEASURES
-            //
-            //TODO: bloquear a thread em vez de fazer sleep para poupar recursos
-            var t3 = Task.Run(() =>
-            {
-                do
-                {
-                    try
-                    {
-                        client.Publish(TOPIC_MEASURES, Encoding.UTF8.GetBytes(of.GetMeasures()), MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE, true);
-                        Console.WriteLine("published measures");
-                        Thread.Sleep(_measuresRefreshRate);
-                    }
-                    catch (Exception ex)
-                    {
-                        // debaixodotapetator pattern
-                        Console.WriteLine("EXCEPTION:\n" + ex.Message);
-                    }
-                } while (true);
+                       //MEASURES
+                       //
+                       //TODO: bloquear a thread em vez de fazer sleep para poupar recursos
+                       var t3 = Task.Run(() =>
+                       {
+                           do
+                           {
+                               try
+                               {
+                                   client.Publish(TOPIC_MEASURES, Encoding.UTF8.GetBytes(of.GetMeasures()), MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE, true);
+                                   Console.WriteLine("published measures");
+                                   Thread.Sleep(_measuresRefreshRate);
+                               }
+                               catch (Exception ex)
+                               {
+                                   // debaixodotapetator pattern
+                                   Console.WriteLine("EXCEPTION:\n" + ex.Message);
+                               }
+                           } while (true);
 
-            });
-
-            Task.WaitAll(t1, t2, t3);    
+                       });
+           */
+            Task.WaitAll(t1, t2);    
         }
 
         private static void Client_MqttMsgPublishReceived(object sender, MqttMsgPublishEventArgs e)
@@ -155,7 +219,10 @@ namespace OFpub
 
             public string GetInstData()
             {
-                return QueryServer("+getinstdata");
+                Console.WriteLine("getting inst data from omniflow...");
+                var r =  QueryServer("+getinstdata");
+                Console.WriteLine("received inst data from omniflow");
+                return r;
             }
 
             public void UpdateInstData()
