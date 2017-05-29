@@ -54,7 +54,7 @@ namespace OFpub
             client = new MqttClient(_brokerUrl);
             // DEBUG:
             client.Subscribe(new[] { TOPIC_PUT, TOPIC_CMD }, new byte[] { MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE, MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE });
-            //client.MqttMsgPublishReceived += ClientRecievedMessage;
+            client.MqttMsgPublishReceived += ClientRecievedMessage;
 
             client.Connect(Guid.NewGuid().ToString());
 
@@ -190,7 +190,7 @@ namespace OFpub
                
             }
         }
-   
+
 
 
         //private class OFAPI
@@ -300,31 +300,31 @@ namespace OFpub
         //        return ret;
         //    }
         //}
-        //static void ClientRecievedMessage(object sender, MqttMsgPublishEventArgs e)
-        //{
-        //    var message = System.Text.Encoding.Default.GetString(e.Message);
-        //    //System.Console.WriteLine("Message received: " + message);
+        static void ClientRecievedMessage(object sender, MqttMsgPublishEventArgs e)
+        {
+            var message = System.Text.Encoding.Default.GetString(e.Message);
+            //System.Console.WriteLine("Message received: " + message);
 
-        //    switch (e.Topic)
-        //    {
-        //        case TOPIC_PUT:
-        //            var tt = message.Replace("{", string.Empty).Replace("}", string.Empty).Split(':');
-        //            var key = tt[0];
-        //            var value = tt[1];
-        //            Task.Run(()=>
-        //            {
-        //                of.QueryServer(string.Format("+put[{0},{1}]", key, value));
-        //                Console.WriteLine("put "+key+" "+value);
-        //                of.UpdateConfData();
-        //                Thread.Sleep(10 * 1000); // wait 10s, as stated in API doc
-        //                client.Publish(TOPIC_CONFDATA, Encoding.UTF8.GetBytes(of.GetConfData()), MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE, true);
-        //            });
-        //            break;
-        //        default:
+            switch (e.Topic)
+            {
+                case TOPIC_PUT:
+                    var tt = message.Replace("{", string.Empty).Replace("}", string.Empty).Split(':');
+                    var key = tt[0];
+                    var value = tt[1];
+                    Task.Run(() =>
+                    {
+                        of.PutValue(key, value);
+                        Console.WriteLine("put " + key + " " + value);
+                       // of.UpdateConfData();
+                        Thread.Sleep(10 * 1000); // wait 10s, as stated in API doc
+                        client.Publish(TOPIC_CONFDATA, Encoding.UTF8.GetBytes(of.GetConfData()), MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE, true);
+                    });
+                    break;
+                default:
 
-        //            break;
-        //    }
-        //}
+                    break;
+            }
+        }
     }
    
 }

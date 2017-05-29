@@ -23,10 +23,10 @@ namespace OFpub
         private string USER_NAME;
         private string USER_PASS;
         private Socket stateSock;
-        private Socket instSock;
-        private Socket confSock;
-        private Socket measuresSock;
-        private Socket putSock;
+        //private Socket instSock;
+        //private Socket confSock;
+        //private Socket measuresSock;
+        //private Socket putSock;
         
         // Explicit static constructor to tell C# compiler
         // not to mark type as beforefieldinit
@@ -44,15 +44,15 @@ namespace OFpub
 
             Console.WriteLine("Putting on the socks...");
             stateSock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            instSock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            confSock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            measuresSock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            putSock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            //instSock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            //confSock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            //measuresSock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            //putSock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             ConnectSocket(stateSock);
-            ConnectSocket(instSock);
-            ConnectSocket(confSock);
-            ConnectSocket(measuresSock);
-            ConnectSocket(putSock);
+            //ConnectSocket(instSock);
+            //ConnectSocket(confSock);
+            //ConnectSocket(measuresSock);
+            //ConnectSocket(putSock);
         }
 
         ~OFWrapper()
@@ -95,12 +95,12 @@ namespace OFpub
             from = from ?? DateTime.Now.AddDays(-10);
             to = to ?? DateTime.Now;
 
-            return SocketQuery(measuresSock, string.Format("+getmeasures[{0:yyyy-MM-dd},{1:yyyy-MM-dd}]", from, to)).Trim('"');
+            return SocketQuery(stateSock, string.Format("+getmeasures[{0:yyyy-MM-dd},{1:yyyy-MM-dd}]", from, to)).Trim('"');
         }
 
         public void PutValue(string key, string value)
         {
-            SocketQuery(putSock, string.Format("+put[{0},{1}]", key, value));
+            SocketQuery(stateSock, string.Format("+put[{0},{1}]", key, value));
             UpdateInstData();
             UpdateConfData();
         }
