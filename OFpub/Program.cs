@@ -316,7 +316,7 @@ namespace OFpub
                         of.PutValue(key, value);
                         Console.WriteLine("put " + key + " " + value);
                        // of.UpdateConfData();
-                        Thread.Sleep(10 * 1000); // wait 10s, as stated in API doc
+                        Thread.Sleep(20 * 1000); // wait 10s, as stated in API doc
                         client.Publish(TOPIC_CONFDATA, Encoding.UTF8.GetBytes(of.GetConfData()), MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE, true);
                     });
                     break;
