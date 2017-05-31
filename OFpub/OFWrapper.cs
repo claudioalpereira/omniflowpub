@@ -22,11 +22,7 @@ namespace OFpub
         private string USER_IMEI;
         private string USER_NAME;
         private string USER_PASS;
-        private Socket stateSock;
-        //private Socket instSock;
-        //private Socket confSock;
-        //private Socket measuresSock;
-        //private Socket putSock;
+        private Socket sock;
         
         // Explicit static constructor to tell C# compiler
         // not to mark type as beforefieldinit
@@ -43,16 +39,8 @@ namespace OFpub
             USER_PASS = "Omni2016";
 
             Console.WriteLine("Putting on the socks...");
-            stateSock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            //instSock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            //confSock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            //measuresSock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            //putSock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            ConnectSocket(stateSock);
-            //ConnectSocket(instSock);
-            //ConnectSocket(confSock);
-            //ConnectSocket(measuresSock);
-            //ConnectSocket(putSock);
+            sock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            ConnectSocket(sock);
         }
 
         ~OFWrapper()
@@ -67,27 +55,27 @@ namespace OFpub
 
         public string GetState()
         {
-            return SocketQuery(stateSock, "+getstate");
+            return SocketQuery(sock, "+getstate");
             
         }
         public string GetInstData()
         {
-            return SocketQuery(stateSock, "+getinstdata");
+            return SocketQuery(sock, "+getinstdata");
 
         }
         public void UpdateInstData()
         {
-            SocketQuery(stateSock, "+updateinst");
+            SocketQuery(sock, "+updateinst");
 
         }
         public string GetConfData()
         {
-            return SocketQuery(stateSock, "+getconfdata");
+            return SocketQuery(sock, "+getconfdata");
 
         }
         public void UpdateConfData()
         {
-            SocketQuery(stateSock, "+updateconf");
+            SocketQuery(sock, "+updateconf");
 
         }
         public string GetMeasures(DateTime? from = null, DateTime? to = null)
@@ -95,12 +83,13 @@ namespace OFpub
             from = from ?? DateTime.Now.AddDays(-10);
             to = to ?? DateTime.Now;
 
-            return SocketQuery(stateSock, string.Format("+getmeasures[{0:yyyy-MM-dd},{1:yyyy-MM-dd}]", from, to)).Trim('"');
+            return SocketQuery(sock, string.Format("+getmeasures[{0:yyyy-MM-dd},{1:yyyy-MM-dd}]", from, to)).Trim('"');
         }
 
-        public void PutValue(string key, string value)
+        public void PutValue(string key, int value)
         {
-            SocketQuery(stateSock, string.Format("+put[{0},{1}]", key, value));
+            var s = string.Format("+put[{0},{1}]", key, value);
+            SocketQuery(sock, s);
             UpdateInstData();
             UpdateConfData();
         }
@@ -185,6 +174,10 @@ namespace OFpub
         /// Sends a message to the server and doesn't wait for a response.
         /// Used for PUT and UPDATE commands.
         /// </summary>
+        /// <alert>
+        /// Cannot be used because OF API answers to any socket.
+        /// Because that, everytime we make a request we have to call sock.Receive
+        /// </alert>
         /// <param name="sock">Socket</param>
         /// <param name="request">Request command (e.g. +updateconf)</param>
         public void SocketSend(Socket sock, string request)
